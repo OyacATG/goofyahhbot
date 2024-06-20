@@ -1,7 +1,6 @@
 import random
 import nextcord
 from nextcord.ext import commands
-import datetime
 import arrow
 import re
 
@@ -178,12 +177,7 @@ def calculate_death_year(birth_year, lifespan):
 # Function to get the relative date
 def get_relative_date():
     now = arrow.utcnow().to('local')
-    if now.date() == (now - datetime.timedelta(days=1)).date():
-        return "Yesterday"
-    elif now.date() == (now + datetime.timedelta(days=1)).date():
-        return "Tomorrow"
-    else:
-        return "Today"
+    return "Today"
 
 def is_valid_url(url):
     regex = re.compile(
@@ -202,7 +196,6 @@ def apply_traits(stats, traits):
     lifespan_adjustment = 0
     for trait in traits:
         if trait in personality_traits:
-            # Personality traits do not affect stats
             trait_descriptions.append(trait)
         elif trait in physical_traits:
             for key, value in physical_traits[trait].items():
@@ -225,25 +218,14 @@ def determine_sexuality():
     else:
         return "Heterosexual"
 
-# Event to set the bot's status
-@bot.event
-async def on_ready():
-    await bot.change_presence(activity=nextcord.Game(name="Risk Universalis"))
-    print(f'Logged in as {bot.user}')
-
 # Helper function to roll for physical traits based on given probabilities
 def roll_physical_trait():
     roll = random.random()
     if roll < 0.75:
-        return None
-    elif roll < 0.85:
-        # Choose a good physical trait
-        good_traits = [trait for trait, effects in physical_traits.items() if any(value > 0 for key, value in effects.items() if key != 'description')]
-        return random.choice(good_traits)
+        return "N/A"
     else:
-        # Choose a bad physical trait
-        bad_traits = [trait for trait, effects in physical_traits.items() if all(value <= 0 for key, value in effects.items() if key != 'description')]
-        return random.choice(bad_traits)
+        all_traits = list(physical_traits.keys())
+        return random.choice(all_traits)
 
 # Add Historical Character Command
 @bot.slash_command(name="addhistorical", description="Add a historical character")
@@ -279,7 +261,7 @@ async def add_historical(interaction: nextcord.Interaction, name: str, dynasty: 
     embed.add_field(name="Lifetime", value=f"{character['Birth Year']} - {character['Death Year']} ({character['Lifespan']} years)", inline=False)
     embed.add_field(name="Parents", value=character['Parents'], inline=False)
     embed.add_field(name="Gender", value=character['Gender'], inline=True)
-    embed.add_field(name="Sexuality", value="Heterosexual", inline=True)
+    embed.add_field(name="Sexuality", value=character['Sexuality'], inline=True)
     embed.set_image(url=character['Image'])
     embed.set_footer(text=f"ID: {character['ID']} | {relative_date}, {current_time}")
 
@@ -450,8 +432,6 @@ async def fornicate(interaction: nextcord.Interaction, motherid: int, fatherid: 
     current_time = arrow.utcnow().to('local').format('h:mm A')
     relative_date = get_relative_date()
 
-    # Send message to channel and get the message link for
-    # Send message to channel and get the message link for child
     embed = nextcord.Embed(title=child_character['Name'], description=child_character['Biography'], color=nextcord.Color.green())
     embed.add_field(name="Dynasty", value=child_character['Dynasty'], inline=False)
     embed.add_field(name="Titles", value=child_character['Titles'], inline=False)
@@ -485,7 +465,6 @@ async def fornicate(interaction: nextcord.Interaction, motherid: int, fatherid: 
         await interaction.response.send_message(f"Child {child_character['Name']} created and sent to {channel.mention}")
     else:
         await interaction.response.send_message("Channel 🧺-characters not found.")
-
 # General Command
 @bot.slash_command(name="general", description="Create a new general")
 async def general(interaction: nextcord.Interaction, name: str, country: str, startyear: int):
@@ -521,7 +500,6 @@ async def general(interaction: nextcord.Interaction, name: str, country: str, st
         character_id += 1
     else:
         await interaction.response.send_message("Channel ⚔-general not found.")
-
 # Admiral Command
 @bot.slash_command(name="admiral", description="Create a new admiral")
 async def admiral(interaction: nextcord.Interaction, name: str, country: str, startyear: int):
@@ -557,27 +535,48 @@ async def admiral(interaction: nextcord.Interaction, name: str, country: str, st
         character_id += 1
     else:
         await interaction.response.send_message("Channel 🧭-admirals not found.")
+# Whois Command
+@bot.slash_command(name="whois", description="Check who owns a character")
+async def whois(interaction: nextcord.Interaction, characterid: int):
+    character = characters.get(characterid)
+    if not character:
+        await interaction.response.send_message(f"Character with ID {characterid} not found.")
+        return
 
-# Tutorial Command
-@bot.slash_command(name="tutorial", description="Show the tutorial")
-async def tutorial(interaction: nextcord.Interaction):
-    embed = nextcord.Embed(
-        title="Bot Tutorial",
-        description="Welcome to the bot tutorial! Here are the steps to get started:",
-        color=nextcord.Color.blue()
-    )
-    embed.add_field(name="1. Creating a Character", value="Use `/createcharacter` to create a new character. You need to provide the name, gender, birth year, dynasty, titles, and biography.", inline=False)
-    embed.add_field(name="2. Adding a Historical Character", value="Use `/addhistorical` to add a historical character. You need to provide the name, dynasty, birth year, death year, titles, and biography.", inline=False)
-    embed.add_field(name="3. Fornicate", value="Use `/fornicate` to create a child from two characters. You need to provide the mother ID, father ID, name, birth year, titles, and biography.", inline=False)
-    embed.add_field(name="4. Editing a Character", value="Use `/editfictional` to edit a fictional character's attributes. You can change the name, dynasty, gender, image URL, titles, biography, traits, and color.", inline=False)
-    embed.add_field(name="5. Checking Character Ownership", value="Use `/whois` to check who owns a character. You need to provide the character ID.", inline=False)
-    embed.add_field(name="6. Transferring a Character", value="Use `/transfer` to transfer a character to someone else. You need to provide the character ID and the new owner.", inline=False)
-    embed.add_field(name="7. Viewing the Leaderboard", value="Use `/leaderboard` to display a leaderboard of characters. You can sort by overall, martial, learning, diplomacy, stewardship, intrigue, prowess, or lifetime.", inline=False)
-    embed.add_field(name="8. Resetting Characters (Admin Only)", value="Use `/resetcharacters` to reset the character ID back to 1 and void all existing characters. This command is only available to administrators.", inline=False)
-    embed.set_footer(text="Use `/help` to see a list of all commands.")
+    owner = await bot.fetch_user(character['Owner'])
+    await interaction.response.send_message(f"Character {character['Name']} (ID: {characterid}) is owned by {owner.mention}.")
+# Leaderboard Command
+@bot.slash_command(name="leaderboard", description="Display a leaderboard of characters")
+async def leaderboard(interaction: nextcord.Interaction, sort_by: str):
+    if sort_by not in ["overall", "martial", "learning", "diplomacy", "stewardship", "intrigue", "prowess", "lifetime"]:
+        await interaction.response.send_message(f"Invalid sort_by option. Choose from: overall, martial, learning, diplomacy, stewardship, intrigue, prowess, lifetime.", ephemeral=True)
+        return
 
-    await interaction.response.send_message(embed=embed)
+    def get_stat_total(character):
+        return character['Martial'] + character['Stewardship'] + character['Learning'] + character['Diplomacy'] + character['Intrigue'] + character['Prowess']
 
+    if sort_by == "overall":
+        sorted_characters = sorted(characters.values(), key=get_stat_total, reverse=True)
+    elif sort_by == "lifetime":
+        sorted_characters = sorted(characters.values(), key=lambda c: c['Lifespan'], reverse=True)
+    else:
+        sorted_characters = sorted(characters.values(), key=lambda c: c[sort_by.capitalize()], reverse=True)
+
+    leaderboard_text = f"**Leaderboard sorted by {sort_by.capitalize()}**\n\n"
+    embed = nextcord.Embed(title=f"Leaderboard sorted by {sort_by.capitalize()}", color=nextcord.Color.green())
+    for i, character in enumerate(sorted_characters[:10], start=1):
+        owner = await bot.fetch_user(character['Owner'])
+        character_link = f"[{character['Name']}]({character['Message Link']})"
+        leaderboard_text += f"{i}. {character_link} (ID: {character['ID']}) - Owner: {owner}\n"
+        if sort_by == "overall":
+            leaderboard_text += f"Total Stats: {get_stat_total(character)}\n"
+        elif sort_by == "lifetime":
+            leaderboard_text += f"Lifetime: {character['Lifespan']} years\n"
+        else:
+            leaderboard_text += f"{sort_by.capitalize()}: {character[sort_by.capitalize()]}\n"
+        embed.add_field(name=f"{i}. {character['Name']}", value=f"ID: {character['ID']}\nOwner: {owner.mention}\n" + (f"Total Stats: {get_stat_total(character)}" if sort_by == "overall" else f"{sort_by.capitalize()}: {character[sort_by.capitalize()]}"), inline=False)
+
+    await interaction.response.send_message(embed=embed, ephemeral=True)
 # Help Command
 @bot.slash_command(name="help", description="List all available commands")
 async def help_command(interaction: nextcord.Interaction):
@@ -598,7 +597,39 @@ async def help_command(interaction: nextcord.Interaction):
     embed.set_footer(text="Use `/tutorial` to get a detailed tutorial on how to use the bot.")
 
     await interaction.response.send_message(embed=embed)
+# Tutorial Command
+@bot.slash_command(name="tutorial", description="Show the tutorial")
+async def tutorial(interaction: nextcord.Interaction):
+    embed = nextcord.Embed(
+        title="Bot Tutorial",
+        description="Welcome to the bot tutorial! Here are the steps to get started:",
+        color=nextcord.Color.blue()
+    )
+    embed.add_field(name="1. Creating a Character", value="Use `/createcharacter` to create a new character. You need to provide the name, gender, birth year, dynasty, titles, and biography.", inline=False)
+    embed.add_field(name="2. Adding a Historical Character", value="Use `/addhistorical` to add a historical character. You need to provide the name, dynasty, birth year, death year, titles, and biography.", inline=False)
+    embed.add_field(name="3. Fornicate", value="Use `/fornicate` to create a child from two characters. You need to provide the mother ID, father ID, name, birth year, titles, and biography.", inline=False)
+    embed.add_field(name="4. Editing a Character", value="Use `/editfictional` to edit a fictional character's attributes. You can change the name, dynasty, gender, image URL, titles, biography, traits, and color.", inline=False)
+    embed.add_field(name="5. Checking Character Ownership", value="Use `/whois` to check who owns a character. You need to provide the character ID.", inline=False)
+    embed.add_field(name="6. Transferring a Character", value="Use `/transfer` to transfer a character to someone else. You need to provide the character ID and the new owner.", inline=False)
+    embed.add_field(name="7. Viewing the Leaderboard", value="Use `/leaderboard` to display a leaderboard of characters. You can sort by overall, martial, learning, diplomacy, stewardship, intrigue, prowess, or lifetime.", inline=False)
+    embed.add_field(name="8. Resetting Characters (Admin Only)", value="Use `/resetcharacters` to reset the character ID back to 1 and void all existing characters. This command is only available to administrators.", inline=False)
+    embed.set_footer(text="Use `/help` to see a list of all commands.")
 
+    await interaction.response.send_message(embed=embed)
+# Transfer Command
+@bot.slash_command(name="transfer", description="Transfer a character to someone else")
+async def transfer(interaction: nextcord.Interaction, characterid: int, new_owner: nextcord.User):
+    character = characters.get(characterid)
+    if not character:
+        await interaction.response.send_message(f"Character with ID {characterid} not found.")
+        return
+
+    if character['Owner'] != interaction.user.id:
+        await interaction.response.send_message("You do not own this character.")
+        return
+
+    character['Owner'] = new_owner.id
+    await interaction.response.send_message(f"Character {character['Name']} (ID: {characterid}) has been transferred to {new_owner.mention}.")
 # Edit Fictional Character Command
 @bot.slash_command(name="editfictional", description="Edit a fictional character's attributes")
 async def edit_fictional(
@@ -697,102 +728,393 @@ async def edit_fictional(
 
     channel = nextcord.utils.get(interaction.guild.channels, name="🧺-characters")
     if channel:
-        message = await channel.fetch_message(int(character['Message Link'].split('/')[-1]))
+        message_id = int(character['Message Link'].split('/')[-1])
+        message = await channel.fetch_message(message_id)
         await message.edit(embed=embed)
         await interaction.response.send_message(f"Character {character['Name']} has been edited. [Jump to message]({character['Message Link']})")
     else:
         await interaction.response.send_message("Channel 🧺-characters not found.")
 
-# Whois Command
-@bot.slash_command(name="whois", description="Check who owns a character")
-async def whois(interaction: nextcord.Interaction, characterid: int):
-    character = characters.get(characterid)
-    if not character:
-        await interaction.response.send_message(f"Character with ID {characterid} not found.")
-        return
+# Duel command
+@bot.slash_command(name="duel", description="Duel between two characters")
+async def duel(interaction: nextcord.Interaction, challenger_id: int, challenged_id: int):
+    async with aiosqlite.connect(DATABASE_FILE) as db:
+        challenger = await get_character(challenger_id)
+        challenged = await get_character(challenged_id)
 
-    owner = await bot.fetch_user(character['Owner'])
-    await interaction.response.send_message(f"Character {character['Name']} (ID: {characterid}) is owned by {owner.mention}.")
+        if not challenger or not challenged:
+            await interaction.response.send_message("One or both characters not found.", ephemeral=True)
+            return
 
-# Transfer Command
-@bot.slash_command(name="transfer", description="Transfer a character to someone else")
-async def transfer(interaction: nextcord.Interaction, characterid: int, new_owner: nextcord.User):
-    character = characters.get(characterid)
-    if not character:
-        await interaction.response.send_message(f"Character with ID {characterid} not found.")
-        return
+        if challenger['owner'] != interaction.user.id:
+            await interaction.response.send_message("You do not own the challenger character.", ephemeral=True)
+            return
 
-    if character['Owner'] != interaction.user.id:
-        await interaction.response.send_message("You do not own this character.")
-        return
+        embed = nextcord.Embed(
+            title="Duel Challenge",
+            description=f"{interaction.user.mention} has challenged {challenged['owner']} to a duel!",
+            color=nextcord.Color.orange()
+        )
+        embed.add_field(name=f"{challenger['name']} vs {challenged['name']}", value=f"{challenger['name']} Intrigue: {challenger['intrigue']}\n{challenged['name']} Intrigue: {challenged['intrigue']}", inline=False)
+        embed.add_field(name="Accept or Decline", value="React with ✅ to accept or ❌ to decline.", inline=False)
 
-    character['Owner'] = new_owner.id
-    await interaction.response.send_message(f"Character {character['Name']} (ID: {characterid}) has been transferred to {new_owner.mention}.")
+        message = await interaction.response.send_message(embed=embed)
+        message = await interaction.original_message()
+        await message.add_reaction("✅")
+        await message.add_reaction("❌")
 
-# Leaderboard Command
-@bot.slash_command(name="leaderboard", description="Display a leaderboard of characters")
-async def leaderboard(interaction: nextcord.Interaction, sort_by: str):
-    if sort_by not in ["overall", "martial", "learning", "diplomacy", "stewardship", "intrigue", "prowess", "lifetime"]:
-        await interaction.response.send_message(f"Invalid sort_by option. Choose from: overall, martial, learning, diplomacy, stewardship, intrigue, prowess, lifetime.")
-        return
+        def check(reaction, user):
+            return user.id == challenged['owner'] and str(reaction.emoji) in ["✅", "❌"]
 
-    def get_stat_total(character):
-        return character['Martial'] + character['Stewardship'] + character['Learning'] + character['Diplomacy'] + character['Intrigue'] + character['Prowess']
+        try:
+            reaction, user = await bot.wait_for("reaction_add", check=check, timeout=60.0)
+        except asyncio.TimeoutError:
+            await interaction.followup.send("Duel request timed out.")
+            return
 
-    if sort_by == "overall":
-        sorted_characters = sorted(characters.values(), key=get_stat_total, reverse=True)
-    elif sort_by == "lifetime":
-        sorted_characters = sorted(characters.values(), key=lambda c: c['Lifespan'], reverse=True)
-    else:
-        sorted_characters = sorted(characters.values(), key=lambda c: c[sort_by.capitalize()], reverse=True)
+        if str(reaction.emoji) == "✅":
+            challenger_roll = random.randint(1, 100) + challenger['intrigue']
+            challenged_roll = random.randint(1, 100) + challenged['intrigue']
 
-    leaderboard_text = f"**Leaderboard sorted by {sort_by.capitalize()}**\n\n"
-    for i, character in enumerate(sorted_characters[:10], start=1):
-        owner = await bot.fetch_user(character['Owner'])
-        character_link = f"[{character['Name']}]({character['Message Link']})"
-        leaderboard_text += f"{i}. {character_link} (ID: {character['ID']}) - Owner: {owner.mention} - "
-        if sort_by == "overall":
-            leaderboard_text += f"Total Stats: {get_stat_total(character)}\n"
-        elif sort_by == "lifetime":
-            leaderboard_text += f"Lifetime: {character['Lifespan']} years\n"
+            result = f"{challenger['name']} wins!" if challenger_roll > challenged_roll else f"{challenged['name']} wins!"
+
+            async with aiosqlite.connect(DATABASE_FILE) as db:
+                await db.execute("""
+                    INSERT INTO duels (challenger, challenged, challenger_roll, challenged_roll, result)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (challenger['id'], challenged['id'], challenger_roll, challenged_roll, result))
+                await db.commit()
+
+            result_embed = nextcord.Embed(
+                title="Duel Result",
+                description=f"The duel between [{challenger['name']}] and [{challenged['name']}] is won by {result}",
+                color=nextcord.Color.red()
+            )
+            await interaction.followup.send(embed=result_embed)
         else:
-            leaderboard_text += f"{sort_by.capitalize()}: {character[sort_by.capitalize()]}\n"
+            await interaction.followup.send("The duel was declined.")
 
-    await interaction.response.send_message(leaderboard_text)
+# Command to create a plot
+@bot.slash_command(name="createplot", description="Create a new plot")
+async def create_plot(interaction: nextcord.Interaction, target_id: int, plot_type: str, description: str, start_year: int):
+    creator_id = interaction.user.id
+    async with aiosqlite.connect(DATABASE_FILE) as db:
+        target = await db.execute_fetchone("SELECT * FROM characters WHERE id = ?", (target_id,))
+        if not target:
+            await interaction.response.send_message(f"Target with ID {target_id} not found.", ephemeral=True)
+            return
 
-# Reset Characters Command
-@bot.slash_command(name="resetcharacters", description="Reset the character ID back to 1 and void all existing characters")
-@commands.has_permissions(administrator=True)
-async def reset_characters(interaction: nextcord.Interaction):
-    global character_id
-    character_id = 1
+        plot_id = await db.execute_fetchone("SELECT MAX(id) FROM plots")
+        plot_id = plot_id[0] + 1 if plot_id[0] else 1
 
-    # Void all existing characters
-    for char_id in characters:
-        characters[char_id]['ID'] = -1
+        success_chance = await calculate_plot_success_chance([creator_id], target_id)
+        discovery_chance = await calculate_plot_discovery_chance([creator_id], target_id)
 
-    # Clear the characters dictionary
-    characters.clear()
+        await db.execute("""
+            INSERT INTO plots (id, creator, target, type, description, participants, start_year, end_year, success_chance, discovery_chance)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (plot_id, creator_id, target_id, plot_type, description, str([creator_id]), start_year, start_year + random.randint(1, 5), success_chance, discovery_chance))
 
-    await interaction.response.send_message("Character ID has been reset to 1 and all existing characters have been voided.")
+        await db.commit()
 
-# Add the reset_characters command to the bot
-bot.add_application_command(reset_characters)
+        channel = nextcord.utils.get(interaction.guild.channels, name="🎭-plots")
+        if channel:
+            await channel.send(
+                f"A new plot has been created.\n"
+                f"Plot ID: {plot_id}\n"
+                f"Target: ???\n"
+                f"Type: ???\n"
+                f"Description: ???\n"
+                f"Start Year: {start_year}"
+            )
 
-# Error handling for missing required arguments and key errors
-@create_character.error
-@fornicate.error
-@add_historical.error
-@edit_fictional.error
-async def missing_argument_error(interaction: nextcord.Interaction, error):
-    if isinstance(error, commands.MissingRequiredArgument):
-        await interaction.response.send_message(f"Error: Missing required argument: {error.param}")
-    elif isinstance(error, KeyError):
-        await interaction.response.send_message(f"Error: Missing required key in the command.")
-    elif isinstance(error, commands.MissingPermissions):
-        await interaction.response.send_message("You do not have the necessary permissions to use this command.")
-    else:
-        await interaction.response.send_message(f"An unexpected error occurred: {str(error)}")
+        await interaction.response.send_message(f"Plot created with ID {plot_id}. Target: {target[0]['name']}, Type: {plot_type}, Description: {description}", ephemeral=True)
 
-# Run the bot
-bot.run('noneofyobusinessbrody')
+# Command to join a plot
+@bot.slash_command(name="joinplot", description="Join an existing plot")
+async def join_plot(interaction: nextcord.Interaction, plot_id: int):
+    async with aiosqlite.connect(DATABASE_FILE) as db:
+        plot = await get_plot(plot_id)
+        if not plot:
+            await interaction.response.send_message(f"Plot with ID {plot_id} not found.", ephemeral=True)
+            return
+
+        participants = eval(plot['participants'])
+        if interaction.user.id in participants:
+            await interaction.response.send_message("You are already part of this plot.", ephemeral=True)
+            return
+
+        participants.append(interaction.user.id)
+        success_chance = await calculate_plot_success_chance(participants, plot['target'])
+        discovery_chance = await calculate_plot_discovery_chance(participants, plot['target'])
+
+        await db.execute("""
+            UPDATE plots
+            SET participants = ?, success_chance = ?, discovery_chance = ?
+            WHERE id = ?
+        """, (str(participants), success_chance, discovery_chance, plot_id))
+        await db.commit()
+
+        await interaction.response.send_message(f"You have joined the plot with ID {plot_id}. Success chance updated to {success_chance}%.", ephemeral=True)
+
+# Command to get plot info
+@bot.slash_command(name="plotinfo", description="Get detailed info about your plot")
+async def plot_info(interaction: nextcord.Interaction, plot_id: int):
+    async with aiosqlite.connect(DATABASE_FILE) as db:
+        plot = await get_plot(plot_id)
+        if not plot:
+            await interaction.response.send_message(f"Plot with ID {plot_id} not found.", ephemeral=True)
+            return
+
+        participants = eval(plot['participants'])
+        if interaction.user.id not in participants:
+            await interaction.response.send_message("You are not part of this plot.", ephemeral=True)
+            return
+
+        target = await get_character(plot['target'])
+        embed = nextcord.Embed(
+            title=f"Plot Information (ID: {plot_id})",
+            description=f"Target: {target['name']}\nType: {plot['type']}\nDescription: {plot['description']}\n"
+                        f"Start Year: {plot['start_year']}\nEnd Year: {plot['end_year']}\n"
+                        f"Success Chance: {plot['success_chance']}%\nDiscovery Chance: {plot['discovery_chance']}%",
+            color=nextcord.Color.blue()
+        )
+        participants_info = "\n".join([f"- <@{participant}>" for participant in participants])
+        embed.add_field(name="Participants", value=participants_info, inline=False)
+
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+# Command to leave a plot
+@bot.slash_command(name="leaveplot", description="Leave an existing plot")
+async def leave_plot(interaction: nextcord.Interaction, plot_id: int):
+    async with aiosqlite.connect(DATABASE_FILE) as db:
+        plot = await get_plot(plot_id)
+        if not plot:
+            await interaction.response.send_message(f"Plot with ID {plot_id} not found.", ephemeral=True)
+            return
+
+        participants = eval(plot['participants'])
+        if interaction.user.id not in participants:
+            await interaction.response.send_message("You are not part of this plot.", ephemeral=True)
+            return
+
+        participants.remove(interaction.user.id)
+        success_chance = await calculate_plot_success_chance(participants, plot['target'])
+        discovery_chance = await calculate_plot_discovery_chance(participants, plot['target'])
+
+        await db.execute("""
+            UPDATE plots
+            SET participants = ?, success_chance = ?, discovery_chance = ?
+            WHERE id = ?
+        """, (str(participants), success_chance, discovery_chance, plot_id))
+        await db.commit()
+
+        await interaction.response.send_message(f"You have left the plot with ID {plot_id}.", ephemeral=True)
+
+# Command to view all plots you are part of
+@bot.slash_command(name="myplots", description="View all plots you are part of")
+async def my_plots(interaction: nextcord.Interaction):
+    async with aiosqlite.connect(DATABASE_FILE) as db:
+        cursor = await db.execute('SELECT * FROM plots')
+        all_plots = await cursor.fetchall()
+
+        plots = [plot for plot in all_plots if interaction.user.id in eval(plot[6])]
+
+    if not plots:
+        await interaction.response.send_message("You are not part of any plots.")
+        return
+
+    embed = nextcord.Embed(title=f"{interaction.user.display_name}'s Plots", color=nextcord.Color.purple())
+    for plot in plots:
+        target = await get_character(plot[3])
+        embed.add_field(name=f"Plot ID: {plot[0]}", value=f"Target: {target['name']}\nType: {plot[4]}\nDescription: {plot[5]}", inline=False)
+
+    await interaction.response.send_message(embed=embed)
+
+# Command to calculate plot success chance
+async def calculate_plot_success_chance(participants, target_id):
+    success_chance = 50
+    for participant_id in participants:
+        participant = await get_character(participant_id)
+        success_chance += participant['intrigue']
+
+    target = await get_character(target_id)
+    success_chance -= target['intrigue']
+    success_chance = max(5, min(95, success_chance))  # Ensure success chance is between 5% and 95%
+    return success_chance
+
+# Command to calculate plot discovery chance
+async def calculate_plot_discovery_chance(participants, target_id):
+    discovery_chance = 0
+    for participant_id in participants:
+        participant = await get_character(participant_id)
+        discovery_chance += participant['intrigue']
+
+    target = await get_character(target_id)
+    discovery_chance -= target['intrigue']
+    discovery_chance = max(5, min(95, discovery_chance))  # Ensure discovery chance is between 5% and 95%
+    return discovery_chance
+# Command to view all available characters
+@bot.slash_command(name="characters", description="View all available characters")
+async def view_characters(interaction: nextcord.Interaction):
+    async with aiosqlite.connect(DATABASE_FILE) as db:
+        cursor = await db.execute('SELECT * FROM characters')
+        all_characters = await cursor.fetchall()
+
+    if not all_characters:
+        await interaction.response.send_message("No characters found.")
+        return
+
+    embed = nextcord.Embed(title="Available Characters", color=nextcord.Color.green())
+    for character in all_characters:
+        embed.add_field(name=f"ID: {character[0]}", value=f"Name: {character[1]}\nType: {character[2]}\nLocation: {character[3]}", inline=False)
+
+    await interaction.response.send_message(embed=embed)
+
+# Command to view details of a specific character
+@bot.slash_command(name="character", description="View details of a specific character")
+async def view_character(interaction: nextcord.Interaction, character_id: int):
+    character = await get_character(character_id)
+    if not character:
+        await interaction.response.send_message(f"Character with ID {character_id} not found.")
+        return
+
+    embed = nextcord.Embed(
+        title=f"{character['name']} (ID: {character['id']})",
+        description=f"Type: {character['type']}\nLocation: {character['location']}\nIntrigue: {character['intrigue']}\nCombat: {character['combat']}",
+        color=nextcord.Color.gold()
+    )
+    await interaction.response.send_message(embed=embed)
+
+# Command to create a new character
+@bot.slash_command(name="createcharacter", description="Create a new character")
+async def create_character(interaction: nextcord.Interaction, name: str, type: str, location: str, intrigue: int, combat: int):
+    async with aiosqlite.connect(DATABASE_FILE) as db:
+        await db.execute("INSERT INTO characters (name, type, location, intrigue, combat) VALUES (?, ?, ?, ?, ?)", (name, type, location, intrigue, combat))
+        await db.commit()
+
+    await interaction.response.send_message(f"Character '{name}' created successfully.")
+
+# Command to delete a character
+@bot.slash_command(name="deletecharacter", description="Delete a character")
+async def delete_character(interaction: nextcord.Interaction, character_id: int):
+    async with aiosqlite.connect(DATABASE_FILE) as db:
+        await db.execute("DELETE FROM characters WHERE id = ?", (character_id,))
+        await db.commit()
+
+    await interaction.response.send_message(f"Character with ID {character_id} deleted successfully.")
+
+# Command to update a character's location
+@bot.slash_command(name="movecharacter", description="Update a character's location")
+async def move_character(interaction: nextcord.Interaction, character_id: int, new_location: str):
+    async with aiosqlite.connect(DATABASE_FILE) as db:
+        await db.execute("UPDATE characters SET location = ? WHERE id = ?", (new_location, character_id))
+        await db.commit()
+
+    await interaction.response.send_message(f"Character with ID {character_id} moved to {new_location}.")
+
+# Command to view all plots
+@bot.slash_command(name="plots", description="View all plots")
+async def view_plots(interaction: nextcord.Interaction):
+    async with aiosqlite.connect(DATABASE_FILE) as db:
+        cursor = await db.execute('SELECT * FROM plots')
+        all_plots = await cursor.fetchall()
+
+    if not all_plots:
+        await interaction.response.send_message("No plots found.")
+        return
+
+    embed = nextcord.Embed(title="All Plots", color=nextcord.Color.red())
+    for plot in all_plots:
+        target = await get_character(plot[3])
+        embed.add_field(
+            name=f"Plot ID: {plot[0]}",
+            value=f"Target: {target['name']}\nType: {plot[4]}\nDescription: {plot[5]}\nParticipants: {', '.join([f'<@{participant}>' for participant in eval(plot[6])])}",
+            inline=False
+        )
+
+    await interaction.response.send_message(embed=embed)
+
+# Command to view a specific plot
+@bot.slash_command(name="plot", description="View details of a specific plot")
+async def view_plot(interaction: nextcord.Interaction, plot_id: int):
+    plot = await get_plot(plot_id)
+    if not plot:
+        await interaction.response.send_message(f"Plot with ID {plot_id} not found.")
+        return
+
+    target = await get_character(plot['target'])
+    participants = [f"<@{participant}>" for participant in eval(plot['participants'])]
+
+    embed = nextcord.Embed(
+        title=f"Plot Information (ID: {plot_id})",
+        description=f"Target: {target['name']}\nType: {plot['type']}\nDescription: {plot['description']}\n"
+                    f"Start Year: {plot['start_year']}\nEnd Year: {plot['end_year']}\n"
+                    f"Success Chance: {plot['success_chance']}%\nDiscovery Chance: {plot['discovery_chance']}%\n"
+                    f"Participants: {', '.join(participants)}",
+        color=nextcord.Color.blue()
+    )
+    await interaction.response.send_message(embed=embed)
+
+# Command to calculate and update plot chances
+@bot.slash_command(name="updateplotchances", description="Calculate and update plot success/discovery chances")
+async def update_plot_chances(interaction: nextcord.Interaction, plot_id: int):
+    plot = await get_plot(plot_id)
+    if not plot:
+        await interaction.response.send_message(f"Plot with ID {plot_id} not found.")
+        return
+
+    participants = eval(plot['participants'])
+    success_chance = await calculate_plot_success_chance(participants, plot['target'])
+    discovery_chance = await calculate_plot_discovery_chance(participants, plot['target'])
+
+    async with aiosqlite.connect(DATABASE_FILE) as db:
+        await db.execute("UPDATE plots SET success_chance = ?, discovery_chance = ? WHERE id = ?", (success_chance, discovery_chance, plot_id))
+        await db.commit()
+
+    await interaction.response.send_message("Plot chances updated successfully.")
+    await interaction.response.send_message("Plot success/discovery chances updated successfully.")
+
+# Function to get a character by ID
+async def get_character(character_id: int) -> dict:
+    async with aiosqlite.connect(DATABASE_FILE) as db:
+        cursor = await db.execute('SELECT * FROM characters WHERE id = ?', (character_id,))
+        character = await cursor.fetchone()
+    return {
+        'id': character[0],
+        'name': character[1],
+        'type': character[2],
+        'location': character[3],
+        'intrigue': character[4],
+        'combat': character[5]
+    } if character else None
+
+# Function to get a plot by ID
+async def get_plot(plot_id: int) -> dict:
+    async with aiosqlite.connect(DATABASE_FILE) as db:
+        cursor = await db.execute('SELECT * FROM plots WHERE id = ?', (plot_id,))
+        plot = await cursor.fetchone()
+    return {
+        'id': plot[0],
+        'target': plot[1],
+        'type': plot[2],
+        'description': plot[3],
+        'start_year': plot[4],
+        'end_year': plot[5],
+        'success_chance': plot[6],
+        'discovery_chance': plot[7],
+        'participants': plot[8]
+    } if plot else None
+
+# Function to calculate the success chance of a plot
+async def calculate_plot_success_chance(participants: list, target_id: int) -> float:
+    # Your calculation logic here
+    return 0.0
+
+# Function to calculate the discovery chance of a plot
+async def calculate_plot_discovery_chance(participants: list, target_id: int) -> float:
+    # Your calculation logic here
+    return 0.0
+
+bot.run("your_token")
+
